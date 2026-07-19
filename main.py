@@ -6,7 +6,7 @@ import yt_dlp
 
 # ការកំណត់ Logging
 logging.basicConfig(level=logging.INFO)
-TOKEN = "8830743228:AAE55qWmpkXYmmJ90OjD4hdaIquzlpuaHSI"
+TOKEN = "8960094993:AAHqx2-QyksRsfTIaIWiihr1d9qDEsPUYpI"
 
 # កំណត់ដំណាក់កាល
 LANG_SELECT = 1
