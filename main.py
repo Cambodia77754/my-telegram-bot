@@ -1,56 +1,74 @@
+import logging
 import os
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 import yt_dlp
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-TOKEN = '8981729970:AAEQtZLqHKr40v_Xj3ZHQo_dq-Vp1W-i7dQ'
-# មុខងារសម្រាប់ប៊ូតុងស្អាតៗ
+# ការកំណត់ Logging
+logging.basicConfig(level=logging.INFO)
+TOKEN = "8830743228:AAE55qWmpkXYmmJ90OjD4hdaIquzlpuaHSI"
+
+# កំណត់ដំណាក់កាល
+LANG_SELECT = 1
+
+# ល្បឿនទាញយកអតិបរមា
+def get_ydl_opts(lang):
+    return {
+        'format': 'best[ext=mp4]/best',
+        'noplaylist': True,
+        'quiet': True,
+        'concurrent_fragment_downloads': 20,
+        'http_chunk_size': 10485760,
+        'writesubtitles': True,
+        'subtitleslangs': [lang], # ជ្រើសរើសភាសាដែលអ្នកចង់បាន
+        'writeautomaticsub': True,
+        'outtmpl': '%(title)s.%(ext)s',
+    }
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        ["📥 ទាញយកវីដេអូ", "📢 ចូលរួមឆានែល"],
-        ["💡 របៀបប្រើប្រាស់", "💬 ទំនាក់ទំនង"]
+        [InlineKeyboardButton("🇰🇭 ខ្មែរ (Khmer)", callback_data='km')],
+        [InlineKeyboardButton("🇬🇧 អង់គ្លេស (English)", callback_data='en')]
     ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(
-        "✨ សួស្តី! សូមជ្រើសរើសមុខងារដែលអ្នកចង់ប្រើ៖",
-        reply_markup=reply_markup
-    )
+    await update.message.reply_text("សូមជ្រើសរើសភាសាសម្រាប់វីដេអូរបស់អ្នក៖", reply_markup=InlineKeyboardMarkup(keyboard))
+    return LANG_SELECT
 
-# មុខងារគ្រប់គ្រងប៊ូតុង
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    
-    if text == "📢 ចូលរួមឆានែល":
-        await update.message.reply_text("👉 ចុចទីនេះដើម្បីចូលរួម៖ https://t.me/LYMOCAMBO_PC")
-    
-    elif text == "💡 របៀបប្រើប្រាស់":
-        await update.message.reply_text("គ្រាន់តែផ្ញើលីង TikTok ឬ Facebook មកខ្ញុំ ខ្ញុំនឹងទាញយកជូនភ្លាមៗ!")
-        
-    elif text == "💬 ទំនាក់ទំនង":
-        await update.message.reply_text("មានបញ្ហា? សូមទំនាក់ទំនងមកកាន់៖ @LYMOCAMBO_PC")
-        
-    else:
-        # បើវាមិនមែនជាប៊ូតុងទេ គឺសន្មត់ថាជាលីងវីដេអូ
-        await download_media(update, context)
+async def set_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    lang = query.data
+    context.user_data['lang'] = lang
+    await query.answer()
+    await query.edit_message_text(f"អ្នកបានជ្រើសរើសភាសា៖ {'🇰🇭 ខ្មែរ' if lang == 'km' else '🇬🇧 អង់គ្លេស'}\n\nសូមផ្ញើ Link វីដេអូមក៖")
+    return 2 # ទៅកាន់ដំណាក់កាលរង់ចាំ Link
 
-# មុខងារទាញយកវីដេអូ
-async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text
-    status_msg = await update.message.reply_text("⏳ កំពុងទាញយក... សូមរង់ចាំបន្តិច!")
+    lang = context.user_data.get('lang', 'en')
+    status_msg = await update.message.reply_text("កំពុងទាញយកយ៉ាងលឿន... 🚀")
     
-    ydl_opts = {'outtmpl': 'video.mp4', 'format': 'best'}
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.extract_info(url, download=True)
-        await update.message.reply_video(video=open('video.mp4', 'rb'))
+        with yt_dlp.YoutubeDL(get_ydl_opts(lang)) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+        
+        await update.message.reply_video(video=open(filename, 'rb'))
+        if os.path.exists(filename): os.remove(filename)
         await status_msg.delete()
-        os.remove('video.mp4')
     except Exception as e:
-        await status_msg.edit_text(f"❌ មានបញ្ហា៖ {str(e)}")
+        await update.message.reply_text(f"មានបញ្ហា៖ {e}")
+    return 2
 
 if __name__ == '__main__':
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    print("Bot កំពុងដំណើរការហើយ...")
-    app.run_polling()
+    application = ApplicationBuilder().token(TOKEN).build()
+    
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            LANG_SELECT: [CallbackQueryHandler(set_lang)],
+            2: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_download)]
+        },
+        fallbacks=[CommandHandler('start', start)]
+    )
+    
+    application.add_handler(conv_handler)
+    application.run_polling()
