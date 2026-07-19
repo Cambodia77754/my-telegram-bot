@@ -3,8 +3,7 @@ import yt_dlp
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-TOKEN = '8884755293:AAF66ydL30PfV9tFQfmLkRRTgVZBf929XXA'
-
+TOKEN = '8981729970:AAEQtZLqHKr40v_Xj3ZHQo_dq-Vp1W-i7dQ'
 # មុខងារសម្រាប់ប៊ូតុងស្អាតៗ
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
